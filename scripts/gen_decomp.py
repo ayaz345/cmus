@@ -59,14 +59,12 @@ def parse_unidata(f):
     for line in f:
         d = line.rstrip('\n').split(';')
         cp = int(d[0], 16)
-        u[cp] = {}
-        u[cp]['name'] = d[1]
-        decomp = d[5]
-        if decomp:
+        u[cp] = {'name': d[1]}
+        if decomp := d[5]:
             m = re.match(r'<.*> (.*)', decomp)
             u[cp]['compat'] = bool(m)
             if m:
-                decomp = m.group(1)
+                decomp = m[1]
             u[cp]['decomp'] = [int(x, 16) for x in decomp.split(' ')]
         else:
             u[cp]['decomp'] = []
@@ -103,11 +101,7 @@ def filter_unidata(unidata, include):
         if unichr(b) == u' ' or is_diacritical_mark(b):
             del unidata[k]
             continue
-        has_accents = False
-        for d in v['decomp'][1:]:
-            if is_diacritical_mark(d):
-                has_accents = True
-                break
+        has_accents = any(is_diacritical_mark(d) for d in v['decomp'][1:])
         if not has_accents:
             del unidata[k]
 
@@ -144,7 +138,6 @@ def main(argv=None):
         help='output file, default stdout')
     (options, args) = parser.parse_args(argv[1:])
 
-    urlbase = 'http://unicode.org/Public/UNIDATA/'
     unidata_filename = 'UnicodeData.txt'
 
     if not os.path.exists(unidata_filename) and not options.wget:
@@ -152,6 +145,7 @@ def main(argv=None):
 from unicode.org or use `--wget' option.''' % unidata_filename)
 
     if options.wget:
+        urlbase = 'http://unicode.org/Public/UNIDATA/'
         unidata_file = urllib2.urlopen(urlbase+unidata_filename)
     else:
         unidata_file = open(unidata_filename, 'rb')
@@ -163,9 +157,7 @@ from unicode.org or use `--wget' option.''' % unidata_filename)
     unidata_expand_decomp(unidata)
     filter_unidata(unidata, [ord(x) for x in special_decompositions])
 
-    outfile = sys.stdout
-    if options.output:
-        outfile = open(options.output, 'wb')
+    outfile = open(options.output, 'wb') if options.output else sys.stdout
     output(unidata, outfile)
     if options.output:
         outfile.close()
